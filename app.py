@@ -1,3 +1,6 @@
+streamlit
+requests
+
 import streamlit as st
 import json
 import time
@@ -11,10 +14,10 @@ from urllib3.util.retry import Retry
 MODEL_NAME = "gemini-2.5-flash-preview-09-2025"
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
-# The API Key is expected to be provided by the Canvas environment or Streamlit Secrets.
-# IMPORTANT: This hardcoded key will only work if running in the original Canvas environment.
-# For Streamlit Cloud deployment, you must configure this as a secret named 'GEMINI_API_KEY'.
-API_KEY = "AIzaSyDpKpfNr8jTL5V9uGqERerXNEym4_Iy6iU" 
+# The API Key is expected to be provided by the Canvas environment
+# NOTE: When deploying to Streamlit Cloud, you will need to add this key
+# as a secret named 'GEMINI_API_KEY' in your app's secrets management.
+API_KEY = "" 
 
 # Define the structure for the LLM's response using a JSON Schema
 # This forces the model to categorize its arguments, making the output predictable and machine-readable.
@@ -77,9 +80,6 @@ def get_session():
 def challenge_premise(premise: str):
     """Calls the Gemini API to analyze the premise and return structured JSON."""
     
-    # Use the API_KEY set in the global scope
-    api_key_to_use = API_KEY 
-    
     payload = {
         "contents": [{"parts": [{"text": f"Analyze the following premise: {premise}"}]}],
         "systemInstruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
@@ -95,7 +95,7 @@ def challenge_premise(premise: str):
     
     try:
         response = session.post(
-            f"{API_URL}?key={api_key_to_use}",
+            f"{API_URL}?key={API_KEY}",
             headers={'Content-Type': 'application/json'},
             json=payload
         )
@@ -109,6 +109,7 @@ def challenge_premise(premise: str):
         # Parse the JSON output
         parsed_output = json.loads(json_text)
         
+        # The API response does not include citations in the JSON output text itself.
         # We manually check the grounding metadata for citation sources.
         grounding_metadata = data.get('candidates', [{}])[0].get('groundingMetadata', {})
         sources = []
@@ -125,11 +126,7 @@ def challenge_premise(premise: str):
         return parsed_output, sources
     
     except requests.exceptions.HTTPError as e:
-        # Check if the error is 400 (Bad Request), which often indicates an issue with the API key or payload
-        if e.response.status_code == 400:
-             st.error("API Error (400 Bad Request): Please ensure the API key is valid and the request payload is correct.")
-        else:
-            st.error(f"HTTP Error: Could not reach the AI service. Status: {e.response.status_code}. Please try again later.")
+        st.error(f"HTTP Error: Could not reach the AI service. Status: {e.response.status_code}. Please try again later.")
         return None, []
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
